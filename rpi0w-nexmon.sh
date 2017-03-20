@@ -23,8 +23,8 @@ TOPDIR=`pwd`
 
 arm="abootimg cgpt fake-hwclock ntpdate vboot-utils vboot-kernel-utils u-boot-tools"
 base="kali-menu kali-defaults initramfs-tools sudo parted e2fsprogs usbutils"
-desktop="fonts-croscore fonts-crosextra-caladea fonts-crosextra-carlito gnome-theme-kali gtk3-engines-xfce kali-desktop-xfce kali-root-login lightdm network-manager network-manager-gnome xfce4 xserver-xorg-video-fbdev xserver-xorg-input-evdev xserver-xorg-input-synaptics"
-tools="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool usbutils net-tools"
+desktop="fonts-croscore fonts-crosextra-caladea fonts-crosextra-carlito gnome-theme-kali gtk3-engines-xfce kali-desktop-xfce kali-root-login lightdm network-manager network-manager-gnome xfce4 xserver-xorg-video-fbdev xserver-xorg-input-evdev xserver-xorg-input-synaptics mate-core mate-desktop mate-desktop-environment mate-notification-daemon xrdp"
+tools="passing-the-hash winexe aircrack-ng hydra john sqlmap wireshark libnfc-bin mfoc nmap ethtool usbutils net-tools hostapd isc-dhcp-server"
 services="openssh-server apache2"
 extras="iceweasel xfce4-terminal wpasupplicant"
 # kernel sauces take up space
@@ -73,12 +73,57 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
 
+# Cofigure dhcp server for AP
+cat << EOF > kali-$architecture/etc/dhcp/dhcpd.conf
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+subnet 192.168.42.0 netmask 255.255.255.0 {
+	range 192.168.42.10 192.168.42.50;
+	option broadcast-address 192.168.42.255;
+	option routers 192.168.42.1;
+	default-lease-time 600;
+	max-lease-time 7200;
+	option domain-name "kali.evil.local";
+	option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
+EOF
+
+cat << EOF > kali-$architecture/etc/hostapd/hostapd.conf
+interface=wlan0
+# driver=rtl871xdrv
+# driver=nl80211
+ssid=Kali_AP
+country_code=FR
+hw_mode=g
+channel=1
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=Raspberry
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=CCMP
+wpa_group_rekey=86400
+ieee80211n=1
+wme_enabled=1
+EOF
+
 cat << EOF > kali-$architecture/etc/network/interfaces
 auto lo
 iface lo inet loopback
 
 auto eth0
 iface eth0 inet dhcp
+
+auto usb0
+iface usb0 inet dhcp
+
+allow-hotplug wlan0
+iface wlan0 inet static
+  address 192.168.42.1
+  netmask 255.255.255.0
 EOF
 
 cat << EOF > kali-$architecture/etc/resolv.conf
@@ -175,7 +220,19 @@ rm -f /etc/ssh/ssh_host_*_key*
 
 systemctl enable regenerate_ssh_host_keys
 
-update-rc.d ssh enable
+updat-rc.d ssh enable
+
+sed -i -e 's/#DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
+sed -i -e 's/# DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
+sed -i -e 's/DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
+
+update-rc.d hostapd enable
+
+sed -i -e 's/#INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
+sed -i -e 's/# INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
+sed -i -e 's/INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
+
+update-rc.d isc-dhcp-server enable
 
 # libinput seems to fail hard on RaspberryPi devices, so we make sure it's not
 # installed here (and we have xserver-xorg-input-evdev and
@@ -331,9 +388,17 @@ ln -s /usr/src/kernel build
 ln -s /usr/src/kernel source
 cd ${basedir}
 
+
 # Create cmdline.txt file
 cat << EOF > ${basedir}/bootp/cmdline.txt
-dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait modules-load=dwc2,g_ether
+EOF
+
+
+# Create config.txt file
+cat << EOF > ${basedir}/bootp/config.txt
+### enable overlay USB dual mode module host + otg
+dtoverlay=dwc2
 EOF
 
 # systemd doesn't seem to be generating the fstab properly for some people, so
@@ -366,6 +431,13 @@ cd ${basedir}
 
 cp ${basedir}/../misc/zram ${basedir}/root/etc/init.d/zram
 chmod +x ${basedir}/root/etc/init.d/zram
+
+# Load custom modules
+echo "dwc2" >> ${basedir}/root/etc/modules
+echo "g_ether" >> ${basedir}/root/etc/modules
+
+echo mate-session> ${basedir}/root/root/.xsession
+cp ${basedir]/root/root/.xsession ${basedir}/root/etc/skel
 
 # Unmount partitions
 umount $bootp
