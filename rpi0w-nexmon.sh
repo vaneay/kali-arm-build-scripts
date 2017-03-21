@@ -73,22 +73,6 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
 
-# Cofigure dhcp server for AP
-cat << EOF > kali-$architecture/etc/dhcp/dhcpd.conf
-default-lease-time 600;
-max-lease-time 7200;
-authoritative;
-
-subnet 192.168.42.0 netmask 255.255.255.0 {
-	range 192.168.42.10 192.168.42.50;
-	option broadcast-address 192.168.42.255;
-	option routers 192.168.42.1;
-	default-lease-time 600;
-	max-lease-time 7200;
-	option domain-name "kali.evil.local";
-	option domain-name-servers 8.8.8.8, 8.8.4.4;
-}
-EOF
 
 cat << EOF > kali-$architecture/etc/hostapd/hostapd.conf
 interface=wlan0
@@ -227,6 +211,23 @@ sed -i -e 's/# DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/
 sed -i -e 's/DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
 
 update-rc.d hostapd enable
+
+# Cofigure dhcp server for AP
+cat << EOF > /etc/dhcp/dhcpd.conf
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+
+subnet 192.168.42.0 netmask 255.255.255.0 {
+	range 192.168.42.10 192.168.42.50;
+	option broadcast-address 192.168.42.255;
+	option routers 192.168.42.1;
+	default-lease-time 600;
+	max-lease-time 7200;
+	option domain-name "kali.evil.local";
+	option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
+EOF
 
 sed -i -e 's/#INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
 sed -i -e 's/# INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
@@ -437,7 +438,7 @@ echo "dwc2" >> ${basedir}/root/etc/modules
 echo "g_ether" >> ${basedir}/root/etc/modules
 
 echo mate-session> ${basedir}/root/root/.xsession
-cp ${basedir]/root/root/.xsession ${basedir}/root/etc/skel
+cp ${basedir}/root/root/.xsession ${basedir}/root/etc/skel
 
 # Unmount partitions
 umount $bootp
