@@ -139,6 +139,7 @@ cp /opt/nexmon/firmware/brcmfmac43430-sdio.bin /lib/firmware/brcm/brcmfmac43430-
 insmod /opt/nexmon/firmware/brcmfmac.ko
 ifconfig wlan0 up 2> /dev/null
 EOF
+
 chmod +x kali-$architecture/usr/bin/monstart
 
 cat << EOF > kali-$architecture/usr/bin/monstop
@@ -154,6 +155,7 @@ modprobe brcmfmac
 ifconfig wlan0 up 2> /dev/null
 echo "Monitor mode stopped"
 EOF
+
 chmod +x kali-$architecture/usr/bin/monstop
 
 cat << EOF > kali-$architecture/lib/systemd/system/regenerate_ssh_host_keys.service
@@ -170,6 +172,7 @@ ExecStartPost=/bin/rm /lib/systemd/system/regenerate_ssh_host_keys.service ; /us
 [Install]
 WantedBy=multi-user.target
 EOF
+
 chmod 755 kali-$architecture/lib/systemd/system/regenerate_ssh_host_keys.service
 
 cat << EOF > kali-$architecture/third-stage
@@ -204,7 +207,7 @@ rm -f /etc/ssh/ssh_host_*_key*
 
 systemctl enable regenerate_ssh_host_keys
 
-updat-rc.d ssh enable
+update-rc.d ssh enable
 
 sed -i -e 's/#DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
 sed -i -e 's/# DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/default/hostapd
@@ -213,7 +216,7 @@ sed -i -e 's/DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/' /etc/de
 update-rc.d hostapd enable
 
 # Cofigure dhcp server for AP
-cat << EOF > /etc/dhcp/dhcpd.conf
+cat << EOF2 > /etc/dhcp/dhcpd.conf
 default-lease-time 600;
 max-lease-time 7200;
 authoritative;
@@ -227,7 +230,7 @@ subnet 192.168.42.0 netmask 255.255.255.0 {
 	option domain-name "kali.evil.local";
 	option domain-name-servers 8.8.8.8, 8.8.4.4;
 }
-EOF
+EOF2
 
 sed -i -e 's/#INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
 sed -i -e 's/# INTERFACES=""/INTERFACES="wlan0"/' /etc/default/isc-dhcp-server
@@ -462,7 +465,8 @@ MACHINE_TYPE=`uname -m`
 if [ ${MACHINE_TYPE} == 'x86_64' ]; then
 echo "Compressing kali-$1-rpi0w-nexmon.img"
 pixz ${basedir}/kali-$1-rpi0w-nexmon.img ${basedir}/kali-$1-rpi0w-nexmon.img.xz
-rm ${basedir}/kali-$1-rpi0w-nexmon.img
+# rm ${basedir}/kali-$1-rpi0w-nexmon.img
 echo "Generating sha1sum for kali-$1-rpi0w-nexmon.img.xz"
 sha1sum kali-$1-rpi0w-nexmon.img.xz > ${basedir}/kali-$1-rpi0w-nexmon.img.xz.sha1sum
+sha1sum kali-$1-rpi0w-nexmon.img > ${basedir}/kali-$1-rpi0w-nexmon.img.sha1sum
 fi
